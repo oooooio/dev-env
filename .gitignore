@@ -1,0 +1,19 @@
+# 环境变量文件
+.env
+
+# Docker相关
+.docker/
+
+# 临时文件
+*.tmp
+*.log
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db

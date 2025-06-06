@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  dev-env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # 必须提供SSH公钥，否则构建失败（密码登录已禁用）
+        SSH_PUBLIC_KEY: ${SSH_PUBLIC_KEY}
+    ports:
+      - "2222:22"
+    volumes:
+      - .:/workspace
+      - dev-env-home:/root
+    environment:
+      - WORKSPACE=/workspace
+    restart: unless-stopped
+    container_name: dev-base-env
+
+volumes:
+  dev-env-home:
