@@ -43,6 +43,12 @@ jobs:
           type=sha
           type=raw,value=latest,enable={{is_default_branch}}
 
+    - name: Debug SSH Public Key
+      run: |
+        echo "SSH_PUBLIC_KEY (first 50 chars): $(echo '${{ secrets.SSH_PUBLIC_KEY }}' | cut -c1-50)..."
+        echo "SSH_PUBLIC_KEY (last 50 chars): ...$(echo '${{ secrets.SSH_PUBLIC_KEY }}' | tail -c50)"
+        echo "SSH_PUBLIC_KEY length: $(echo '${{ secrets.SSH_PUBLIC_KEY }}' | wc -c)"
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
@@ -54,6 +60,7 @@ jobs:
           SSH_PUBLIC_KEY=${{ secrets.SSH_PUBLIC_KEY }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        no-cache: true
 
     - name: Print image info
       run: |

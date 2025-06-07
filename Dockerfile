@@ -38,9 +38,11 @@ RUN if [ -z "$SSH_PUBLIC_KEY" ]; then \
         echo "docker build --build-arg SSH_PUBLIC_KEY=\"$(cat ~/.ssh/id_ed25519.pub)\" ." && \
         exit 1; \
     fi && \
+    echo "🔑 设置SSH公钥 (前30字符): $(echo "$SSH_PUBLIC_KEY" | cut -c1-30)..." && \
     echo "$SSH_PUBLIC_KEY" > /root/.ssh/authorized_keys && \
     chmod 600 /root/.ssh/authorized_keys && \
-    chown root:root /root/.ssh/authorized_keys
+    chown root:root /root/.ssh/authorized_keys && \
+    echo "✅ SSH公钥设置完成"
 
 # 暴露SSH端口
 EXPOSE 22
