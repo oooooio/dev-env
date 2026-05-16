@@ -22,7 +22,7 @@ RUN apt-get update \
     && mv /root/.local/bin/uvx /usr/local/bin/uvx \
     && git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
     && curl -o- https://fnm.vercel.app/install | bash \
-    && source /root/.bashrc \
+    && . /root/.bashrc \
     && fnm install 24 \
     && fnm use 24 \
     && npm i -g opencode-ai \
