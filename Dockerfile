@@ -9,7 +9,8 @@ ENV TZ=Asia/Shanghai \
     UV_NO_EDITABLE=1 \
     UV_VENV_DIR=/venv \
     GH_PROXY=https://gh-proxy.com \
-    FNM_DIR=/root/.local/share/fnm
+    FNM_DIR=/root/.local/share/fnm \
+    HF_ENDPOINT=https://hf-mirror.com
 
 ENV PATH="$FNM_DIR:$PATH"
 
