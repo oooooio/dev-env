@@ -9,3 +9,8 @@ services:
       - "2222:22"
     restart: unless-stopped
     container_name: dev-base-env
+    volumes:
+      - uv-cache:/root/.cache/uv
+
+volumes:
+  uv-cache:

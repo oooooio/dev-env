@@ -4,9 +4,9 @@ ENV TZ=Asia/Shanghai \
     LANG=C.UTF-8 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_NO_CACHE=1 \
     UV_NO_DEV=1 \
     UV_NO_EDITABLE=1 \
+    UV_LINK_MODE=copy \
     UV_VENV_DIR=/venv \
     GH_PROXY=https://gh-proxy.com \
     FNM_DIR=/root/.local/share/fnm \
@@ -16,7 +16,7 @@ ENV PATH="$FNM_DIR:$PATH"
 
 # 安装基础依赖和工具
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git vim openssh-server python3 unzip \
+    && apt-get install -y --no-install-recommends ca-certificates curl git vim tmux openssh-server python3 unzip \
     && rm -rf /var/lib/apt/lists/* \
     && curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uv /usr/local/bin/uv \
