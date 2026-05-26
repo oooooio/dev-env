@@ -84,4 +84,4 @@ ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY}/https://github.com/astral-sh/python-bui
 
 EXPOSE 22
 
-CMD ["/usr/sbin/sshd", "-D"]
+CMD ["bash", "-c", "mkdir -p /var/run/sshd && /usr/sbin/sshd -D"]
