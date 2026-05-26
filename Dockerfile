@@ -32,6 +32,7 @@ RUN useradd -m -s /bin/bash 20zhaiyilin \
 
 # 安装 uv (系统级)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && mkdir -p /usr/local/bin \
     && mv /root/.local/bin/uv /usr/local/bin/uv \
     && mv /root/.local/bin/uvx /usr/local/bin/uvx
 
