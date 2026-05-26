@@ -45,7 +45,7 @@ USER 20zhaiyilin
 
 RUN git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
     && curl -o- https://fnm.vercel.app/install | bash \
-    && . "$HOME/.bashrc" \
+    && eval "$(fnm env)" \
     && fnm install 24 \
     && fnm use 24 \
     && npm i -g opencode-ai @anthropic-ai/claude-code \
