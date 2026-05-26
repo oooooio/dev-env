@@ -1,4 +1,4 @@
-FROM dhi.io/debian-base:trixie-debian13-dev
+FROM debian:13
 
 ENV TZ=Asia/Shanghai \
     LANG=C.UTF-8 \
