@@ -24,11 +24,9 @@ RUN useradd -m -s /bin/bash 20zhaiyilin \
     && echo "20zhaiyilin ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/20zhaiyilin \
     && mkdir -p /home/20zhaiyilin/.ssh \
     && chmod 700 /home/20zhaiyilin/.ssh \
-    && cat > /home/20zhaiyilin/.ssh/authorized_keys <<'EOF'
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOCXQNggLyEZhjxf0CBOdXOK2DzgEa5AmoAMsEaAvR9G
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDPGn4blND4QhvGbXdD7EYo/PMi7hkVb1WsdFDxWQCf
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBSfiYu7iqqMvoVmMqcqApM44osw44T6nKzF/LPg5uoh
-EOF
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOCXQNggLyEZhjxf0CBOdXOK2DzgEa5AmoAMsEaAvR9G' > /home/20zhaiyilin/.ssh/authorized_keys \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDPGn4blND4QhvGbXdD7EYo/PMi7hkVb1WsdFDxWQCf' >> /home/20zhaiyilin/.ssh/authorized_keys \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBSfiYu7iqqMvoVmMqcqApM44osw44T6nKzF/LPg5uoh' >> /home/20zhaiyilin/.ssh/authorized_keys \
     && chmod 600 /home/20zhaiyilin/.ssh/authorized_keys \
     && chown -R 20zhaiyilin:20zhaiyilin /home/20zhaiyilin/.ssh
 
