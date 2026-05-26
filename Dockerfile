@@ -9,7 +9,7 @@ ENV TZ=Asia/Shanghai \
     UV_LINK_MODE=copy \
     UV_VENV_DIR=/venv \
     GH_PROXY=https://gh-proxy.com \
-    FNM_DIR=/home/20zhaiyilin/.local/share/fnm \
+    FNM_DIR=/home/zhaiyilin/.local/share/fnm \
     HF_ENDPOINT=https://hf-mirror.com
 
 ENV PATH="$FNM_DIR:$PATH"
@@ -20,15 +20,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建普通用户并授权 sudo
-RUN useradd -m -s /bin/bash 20zhaiyilin \
-    && echo "20zhaiyilin ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/20zhaiyilin \
-    && mkdir -p /home/20zhaiyilin/.ssh \
-    && chmod 700 /home/20zhaiyilin/.ssh \
-    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOCXQNggLyEZhjxf0CBOdXOK2DzgEa5AmoAMsEaAvR9G' > /home/20zhaiyilin/.ssh/authorized_keys \
-    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDPGn4blND4QhvGbXdD7EYo/PMi7hkVb1WsdFDxWQCf' >> /home/20zhaiyilin/.ssh/authorized_keys \
-    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBSfiYu7iqqMvoVmMqcqApM44osw44T6nKzF/LPg5uoh' >> /home/20zhaiyilin/.ssh/authorized_keys \
-    && chmod 600 /home/20zhaiyilin/.ssh/authorized_keys \
-    && chown -R 20zhaiyilin:20zhaiyilin /home/20zhaiyilin/.ssh
+RUN useradd -m -s /bin/bash zhaiyilin \
+    && echo "zhaiyilin ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/zhaiyilin \
+    && mkdir -p /home/zhaiyilin/.ssh \
+    && chmod 700 /home/zhaiyilin/.ssh \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOCXQNggLyEZhjxf0CBOdXOK2DzgEa5AmoAMsEaAvR9G' > /home/zhaiyilin/.ssh/authorized_keys \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDPGn4blND4QhvGbXdD7EYo/PMi7hkVb1WsdFDxWQCf' >> /home/zhaiyilin/.ssh/authorized_keys \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBSfiYu7iqqMvoVmMqcqApM44osw44T6nKzF/LPg5uoh' >> /home/zhaiyilin/.ssh/authorized_keys \
+    && chmod 600 /home/zhaiyilin/.ssh/authorized_keys \
+    && chown -R zhaiyilin:zhaiyilin /home/zhaiyilin/.ssh
 
 # 安装 uv (系统级)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
@@ -41,7 +41,7 @@ RUN curl -LsSf "https://github.com/rtk-ai/rtk/releases/download/v0.42.0/rtk-x86_
     | tar xz -C /usr/local/bin
 
 # 用户级工具 (fnm, node, npm 全局包)
-USER 20zhaiyilin
+USER zhaiyilin
 
 RUN git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
     && curl -o- https://fnm.vercel.app/install | bash \
@@ -75,8 +75,8 @@ RUN mkdir -p /var/run/sshd \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 
 # uv 配置
-RUN mkdir -p /home/20zhaiyilin/.config/uv
-COPY --chown=20zhaiyilin:20zhaiyilin configs/uv.toml /home/20zhaiyilin/.config/uv/uv.toml
+RUN mkdir -p /home/zhaiyilin/.config/uv
+COPY --chown=zhaiyilin:zhaiyilin configs/uv.toml /home/zhaiyilin/.config/uv/uv.toml
 
 # 设置镜像环境变量
 ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY}/https://github.com/astral-sh/python-build-standalone/releases/download \
