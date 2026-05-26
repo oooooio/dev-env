@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM dhi.io/debian-base:trixie-debian13-dev
 
 ENV TZ=Asia/Shanghai \
     LANG=C.UTF-8 \
@@ -9,40 +9,75 @@ ENV TZ=Asia/Shanghai \
     UV_LINK_MODE=copy \
     UV_VENV_DIR=/venv \
     GH_PROXY=https://gh-proxy.com \
-    FNM_DIR=/root/.local/share/fnm \
+    FNM_DIR=/home/20zhaiyilin/.local/share/fnm \
     HF_ENDPOINT=https://hf-mirror.com
 
 ENV PATH="$FNM_DIR:$PATH"
 
-# 安装基础依赖和工具
+# 安装基础依赖
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git vim tmux openssh-server python3 unzip \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && apt-get install -y --no-install-recommends ca-certificates curl git vim tmux openssh-server python3 unzip ripgrep sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建普通用户并授权 sudo
+RUN useradd -m -s /bin/bash 20zhaiyilin \
+    && echo "20zhaiyilin ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/20zhaiyilin \
+    && mkdir -p /home/20zhaiyilin/.ssh \
+    && chmod 700 /home/20zhaiyilin/.ssh \
+    && cat > /home/20zhaiyilin/.ssh/authorized_keys <<'EOF'
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOCXQNggLyEZhjxf0CBOdXOK2DzgEa5AmoAMsEaAvR9G
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDPGn4blND4QhvGbXdD7EYo/PMi7hkVb1WsdFDxWQCf
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBSfiYu7iqqMvoVmMqcqApM44osw44T6nKzF/LPg5uoh
+EOF
+    && chmod 600 /home/20zhaiyilin/.ssh/authorized_keys \
+    && chown -R 20zhaiyilin:20zhaiyilin /home/20zhaiyilin/.ssh
+
+# 安装 uv (系统级)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uv /usr/local/bin/uv \
-    && mv /root/.local/bin/uvx /usr/local/bin/uvx \
-    && git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
+    && mv /root/.local/bin/uvx /usr/local/bin/uvx
+
+# 安装 rtk (系统级)
+RUN curl -LsSf "https://github.com/rtk-ai/rtk/releases/download/v0.42.0/rtk-x86_64-unknown-linux-musl.tar.gz" \
+    | tar xz -C /usr/local/bin
+
+# 用户级工具 (fnm, node, npm 全局包)
+USER 20zhaiyilin
+
+RUN git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
     && curl -o- https://fnm.vercel.app/install | bash \
-    && . /root/.bashrc \
+    && . "$HOME/.bashrc" \
     && fnm install 24 \
     && fnm use 24 \
-    && npm i -g opencode-ai \
+    && npm i -g opencode-ai @anthropic-ai/claude-code \
     && npm config set registry https://registry.npmmirror.com
 
+USER root
+
 # 全部安装完成后切换为清华源
-RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' /etc/apt/sources.list.d/ubuntu.sources \
-    && sed -i 's|http://security.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' /etc/apt/sources.list.d/ubuntu.sources
+RUN cat > /etc/apt/sources.list.d/debian.sources <<'EOF'
+Types: deb
+URIs: https://mirrors.tuna.tsinghua.edu.cn/debian
+Suites: trixie trixie-updates trixie-backports
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://security.debian.org/debian-security
+Suites: trixie-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
 
 # SSH 配置
 RUN mkdir -p /var/run/sshd \
     && ssh-keygen -A \
-    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
+    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 
 # uv 配置
-RUN mkdir -p /root/.config/uv
-COPY configs/uv.toml /root/.config/uv/uv.toml
-RUN chmod 644 /root/.config/uv/uv.toml
+RUN mkdir -p /home/20zhaiyilin/.config/uv
+COPY --chown=20zhaiyilin:20zhaiyilin configs/uv.toml /home/20zhaiyilin/.config/uv/uv.toml
 
 # 设置镜像环境变量
 ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY}/https://github.com/astral-sh/python-build-standalone/releases/download \
