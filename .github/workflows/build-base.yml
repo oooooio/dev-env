@@ -53,9 +53,6 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        build-args: |
-          SSH_PUBLIC_KEY=${{ secrets.SSH_PUBLIC_KEY }}
-          CDSAPI_KEY=${{ secrets.CDSAPI_KEY }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         no-cache: true
@@ -69,4 +66,4 @@ jobs:
         echo "docker run -d -p 2222:22 --name dev-env ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
         echo ""
         echo "To connect via SSH:"
-        echo "ssh -p 2222 root@localhost"
+        echo "ssh -p 2222 developer@localhost"

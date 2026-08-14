@@ -8,6 +8,10 @@
 *.tmp
 *.log
 
+# SSH 私钥 (切勿提交!)
+configs/sing-box/ssh_key
+*.pem
+
 # IDE文件
 .vscode/
 .idea/

@@ -9,7 +9,7 @@ ENV TZ=Asia/Shanghai \
     UV_LINK_MODE=copy \
     UV_VENV_DIR=/venv \
     GH_PROXY=https://gh-proxy.com \
-    FNM_DIR=/home/zhaiyilin/.local/share/fnm \
+    FNM_DIR=/home/developer/.local/share/fnm \
     HF_ENDPOINT=https://hf-mirror.com
 
 ENV PATH="$FNM_DIR:$PATH"
@@ -20,15 +20,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建普通用户并授权 sudo
-RUN useradd -m -s /bin/bash zhaiyilin \
-    && echo "zhaiyilin ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/zhaiyilin \
-    && mkdir -p /home/zhaiyilin/.ssh \
-    && chmod 700 /home/zhaiyilin/.ssh \
-    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOCXQNggLyEZhjxf0CBOdXOK2DzgEa5AmoAMsEaAvR9G' > /home/zhaiyilin/.ssh/authorized_keys \
-    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDPGn4blND4QhvGbXdD7EYo/PMi7hkVb1WsdFDxWQCf' >> /home/zhaiyilin/.ssh/authorized_keys \
-    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBSfiYu7iqqMvoVmMqcqApM44osw44T6nKzF/LPg5uoh' >> /home/zhaiyilin/.ssh/authorized_keys \
-    && chmod 600 /home/zhaiyilin/.ssh/authorized_keys \
-    && chown -R zhaiyilin:zhaiyilin /home/zhaiyilin/.ssh
+RUN useradd -m -s /bin/bash developer \
+    && echo "developer ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/developer \
+    && mkdir -p /home/developer/.ssh \
+    && chmod 700 /home/developer/.ssh \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOCXQNggLyEZhjxf0CBOdXOK2DzgEa5AmoAMsEaAvR9G' > /home/developer/.ssh/authorized_keys \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDPGn4blND4QhvGbXdD7EYo/PMi7hkVb1WsdFDxWQCf' >> /home/developer/.ssh/authorized_keys \
+    && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBSfiYu7iqqMvoVmMqcqApM44osw44T6nKzF/LPg5uoh'>> /home/developer/.ssh/authorized_keys \
+    && chmod 600 /home/developer/.ssh/authorized_keys \
+    && chown -R developer:developer /home/developer/.ssh
 
 # 安装 uv (系统级)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
@@ -36,12 +36,26 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uv /usr/local/bin/uv \
     && mv /root/.local/bin/uvx /usr/local/bin/uvx
 
-# 安装 rtk (系统级)
-RUN curl -LsSf "https://github.com/rtk-ai/rtk/releases/download/v0.42.0/rtk-x86_64-unknown-linux-musl.tar.gz" \
+# 安装 rtk (系统级, 按目标架构下载)
+RUN case "$(uname -m)" in \
+      aarch64) RTK_ASSET=rtk-aarch64-unknown-linux-gnu ;; \
+      *)       RTK_ASSET=rtk-x86_64-unknown-linux-musl ;; \
+    esac \
+    && curl -LsSf "https://github.com/rtk-ai/rtk/releases/download/v0.42.0/${RTK_ASSET}.tar.gz" \
     | tar xz -C /usr/local/bin
 
+# 安装 sing-box (系统级, 按目标架构下载)
+RUN case "$(uname -m)" in \
+      aarch64) SING_BOX_ARCH=arm64 ;; \
+      *)       SING_BOX_ARCH=amd64 ;; \
+    esac \
+    && curl -LsSf "${GH_PROXY}/https://github.com/SagerNet/sing-box/releases/download/v1.13.18/sing-box-1.13.18-linux-${SING_BOX_ARCH}.tar.gz" \
+    | tar xz -C /tmp \
+    && mv /tmp/sing-box-1.13.18-linux-${SING_BOX_ARCH}/sing-box /usr/local/bin/sing-box \
+    && rm -rf /tmp/sing-box-1.13.18-linux-${SING_BOX_ARCH}
+
 # 用户级工具 (fnm, node, npm 全局包)
-USER zhaiyilin
+USER developer
 
 RUN git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
     && curl -o- https://fnm.vercel.app/install | bash \
@@ -75,13 +89,21 @@ RUN mkdir -p /var/run/sshd \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 
 # uv 配置
-RUN mkdir -p /home/zhaiyilin/.config/uv
-COPY --chown=zhaiyilin:zhaiyilin configs/uv.toml /home/zhaiyilin/.config/uv/uv.toml
+RUN mkdir -p /home/developer/.config/uv
+COPY --chown=developer:developer configs/uv.toml /home/developer/.config/uv/uv.toml
 
 # 设置镜像环境变量
 ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY}/https://github.com/astral-sh/python-build-standalone/releases/download \
     FNM_NODE_DIST_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
 
+# sing-box 配置 (模板; 镜像不内置任何代理服务器信息, SSH 代理由运行时环境变量渲染)
+COPY configs/sing-box/config.json /etc/sing-box/config.json
+
+# 启动脚本 (sshd + sing-box) 与 SSH 代理渲染器
+COPY scripts/start.sh /usr/local/bin/start.sh
+COPY scripts/render-ssh-proxy.py /usr/local/bin/render-ssh-proxy.py
+RUN chmod +x /usr/local/bin/start.sh
+
 EXPOSE 22
 
-CMD ["bash", "-c", "mkdir -p /var/run/sshd && /usr/sbin/sshd -D"]
+CMD ["/usr/local/bin/start.sh"]
