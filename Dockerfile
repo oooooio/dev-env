@@ -16,7 +16,7 @@ ENV PATH="$FNM_DIR:$PATH"
 
 # 安装基础依赖
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git vim tmux openssh-server python3 unzip ripgrep sudo \
+    && apt-get install -y --no-install-recommends ca-certificates curl direnv git vim tmux openssh-server python3 unzip ripgrep sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建普通用户并授权 sudo
@@ -36,36 +36,91 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uv /usr/local/bin/uv \
     && mv /root/.local/bin/uvx /usr/local/bin/uvx
 
-# 安装 rtk (系统级, 按目标架构下载)
+# 安装 rtk (系统级, 按目标架构下载最新稳定版)
 RUN case "$(uname -m)" in \
       aarch64) RTK_ASSET=rtk-aarch64-unknown-linux-gnu ;; \
       *)       RTK_ASSET=rtk-x86_64-unknown-linux-musl ;; \
     esac \
-    && curl -LsSf "https://github.com/rtk-ai/rtk/releases/download/v0.42.0/${RTK_ASSET}.tar.gz" \
+    && curl -LsSf "${GH_PROXY}/https://github.com/rtk-ai/rtk/releases/latest/download/${RTK_ASSET}.tar.gz" \
     | tar xz -C /usr/local/bin
 
-# 安装 sing-box (系统级, 按目标架构下载)
-RUN case "$(uname -m)" in \
+# 安装 sing-box (系统级, 按目标架构下载最新稳定版)
+RUN SING_BOX_VERSION="$(curl -LsSf "${GH_PROXY}/https://api.github.com/repos/SagerNet/sing-box/releases/latest" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')" \
+    && case "$(uname -m)" in \
       aarch64) SING_BOX_ARCH=arm64 ;; \
       *)       SING_BOX_ARCH=amd64 ;; \
     esac \
-    && curl -LsSf "${GH_PROXY}/https://github.com/SagerNet/sing-box/releases/download/v1.13.18/sing-box-1.13.18-linux-${SING_BOX_ARCH}.tar.gz" \
+    && curl -LsSf "${GH_PROXY}/https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}.tar.gz" \
     | tar xz -C /tmp \
-    && mv /tmp/sing-box-1.13.18-linux-${SING_BOX_ARCH}/sing-box /usr/local/bin/sing-box \
-    && rm -rf /tmp/sing-box-1.13.18-linux-${SING_BOX_ARCH}
+    && mv /tmp/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}/sing-box /usr/local/bin/sing-box \
+    && rm -rf /tmp/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}
 
-# 用户级工具 (fnm, node, npm 全局包)
+# 安装 fnm (系统级, 按目标架构下载最新稳定版)
+# 从 GitHub Releases 下载 (gh-proxy), 避免 fnm.vercel.app 在国内不稳定
+RUN case "$(uname -m)" in \
+      aarch64) FNM_ASSET=fnm-arm64 ;; \
+      *)       FNM_ASSET=fnm-linux ;; \
+    esac \
+    && curl -LsSf "${GH_PROXY}/https://github.com/Schniz/fnm/releases/latest/download/${FNM_ASSET}.zip" -o /tmp/fnm.zip \
+    && unzip -o /tmp/fnm.zip -d /usr/local/bin \
+    && rm /tmp/fnm.zip
+
+# 用户级工具 (node LTS, npm 全局包)
 USER developer
 
 RUN git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
-    && curl -o- https://fnm.vercel.app/install | bash \
     && eval "$(fnm env)" \
-    && fnm install 24 \
-    && fnm use 24 \
+    && fnm install --lts \
+    && fnm use lts-latest \
     && npm i -g opencode-ai @anthropic-ai/claude-code \
-    && npm config set registry https://registry.npmmirror.com
+    && npm config set registry https://registry.npmmirror.com \
+    && cat >> ~/.bashrc <<'EOF'
+# fnm: 自动切换 node 版本
+eval "$(fnm env --use-on-cd)"
+# direnv: 自动加载 .envrc (docker exec / 非登录 shell)
+eval "$(direnv hook bash)"
+# 开发容器信任所有 .envrc, 进入目录或编辑 .envrc 后自动 allow, 无需手动执行
+if ! command -v _direnv_auto_allow >/dev/null 2>&1; then
+    _direnv_auto_allow() {
+        [ -f .envrc ] && direnv allow >/dev/null 2>&1
+    }
+    cd() {
+        builtin cd "$@" || return $?
+        _direnv_auto_allow
+    }
+fi
+if [[ "${PROMPT_COMMAND[*]:-}" != *"_direnv_auto_allow"* ]]; then
+    PROMPT_COMMAND=(_direnv_auto_allow "${PROMPT_COMMAND[@]}")
+fi
+EOF
+
+# 登录 shell 配置 (SSH 会话): .profile 只在登录 shell 读取, 且会被 /etc/profile 重置 PATH
+RUN cat > ~/.profile <<'EOF'
+# 登录 shell (SSH) 会被 /etc/profile 重置 PATH, 这里恢复 node 等路径
+export PATH="/usr/local/node-bin:$FNM_DIR:$PATH"
+eval "$(fnm env --use-on-cd)"
+# direnv: 自动加载 .envrc (SSH 登录 shell)
+eval "$(direnv hook bash)"
+if ! command -v _direnv_auto_allow >/dev/null 2>&1; then
+    _direnv_auto_allow() {
+        [ -f .envrc ] && direnv allow >/dev/null 2>&1
+    }
+    cd() {
+        builtin cd "$@" || return $?
+        _direnv_auto_allow
+    }
+fi
+if [[ "${PROMPT_COMMAND[*]:-}" != *"_direnv_auto_allow"* ]]; then
+    PROMPT_COMMAND=(_direnv_auto_allow "${PROMPT_COMMAND[@]}")
+fi
+EOF
 
 USER root
+
+# 将 node 版本 bin 目录链接到稳定路径, 保证所有会话 (docker exec/SSH/脚本) 都能用 node
+RUN ln -sfn "$(ls -d /home/developer/.local/share/fnm/node-versions/v*/installation/bin)" /usr/local/node-bin
+ENV PATH="/usr/local/node-bin:$PATH"
 
 # 全部安装完成后切换为清华源
 RUN cat > /etc/apt/sources.list.d/debian.sources <<'EOF'

@@ -33,9 +33,9 @@ docker-compose down
 ## 包含的内容
 
 - Debian 13 (trixie)
-- 基础工具：curl、git、vim、tmux、ripgrep、unzip、sudo
+- 基础工具：curl、git、vim、tmux、ripgrep、unzip、sudo、[direnv](https://direnv.net)（进入目录自动加载 `.envrc`，容器内已配置自动 `direnv allow`）
 - Python：系统 python3 + [uv](https://astral.sh/uv)（极速 Python 包管理器和运行器，系统级安装）
-- Node.js：[fnm](https://github.com/Schniz/fnm) + Node 24，含 npm 全局包 `opencode-ai`、`@anthropic-ai/claude-code`
+- Node.js：[fnm](https://github.com/Schniz/fnm) + 最新 LTS 版本，含 npm 全局包 `opencode-ai`、`@anthropic-ai/claude-code`
 - [rtk](https://github.com/rtk-ai/rtk) - Rust Token Killer，系统级安装
 - [sing-box](https://github.com/SagerNet/sing-box) - 代理客户端（TUN 全局代理 + SOCKS5/HTTP 端口代理）
 - SSH 服务：仅密钥登录，禁用 root，端口 22
