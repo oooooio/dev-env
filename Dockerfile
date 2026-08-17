@@ -129,14 +129,14 @@ RUN mkdir -p /var/run/sshd \
 # sshd 会话环境来自 PAM (pam_env 读 /etc/environment), 不继承镜像 ENV;
 # 上面写入 node 路径, 保证 ssh host 'cmd' 等非登录 shell (不读 .profile) 也能用 node
 
-# sing-box 配置 (模板; 镜像不内置任何代理服务器信息, SSH 代理由运行时环境变量渲染)
+# sing-box 配置模板 (SSH 代理由手动执行 render-ssh-proxy.sh 生成运行时配置)
 COPY configs/sing-box/config.json /etc/sing-box/config.json
 
-# 启动脚本 (sshd) 与手动 SSH 代理配置脚本
-COPY scripts/start.sh /usr/local/bin/start.sh
+# 手动 SSH 代理配置脚本
 COPY scripts/render-ssh-proxy.sh /usr/local/bin/render-ssh-proxy.sh
-RUN chmod +x /usr/local/bin/start.sh /usr/local/bin/render-ssh-proxy.sh
+RUN chmod +x /usr/local/bin/render-ssh-proxy.sh
 
 EXPOSE 22
 
-CMD ["/usr/local/bin/start.sh"]
+# 不使用启动脚本; 仅在运行时创建 sshd 目录并启动 sshd
+CMD ["bash", "-c", "mkdir -p /var/run/sshd && exec /usr/sbin/sshd -D"]
