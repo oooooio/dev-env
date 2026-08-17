@@ -56,10 +56,9 @@ SSH 配置：`PermitRootLogin no`、`PasswordAuthentication no`，仅允许密�
 
 ## sing-box 代理客户端
 
-镜像内置 sing-box 客户端，支持两种模式（可同时开启），并内置**国内直连 / 国外代理分流**：
+镜像内置 sing-box 客户端，提供**容器内 TUN 全局透明代理**，并内置**国内直连 / 国外代理分流**：
 
-- **TUN 全局透明代理**：容器内所有流量（git、apt、pip、claude 等）自动分流，无需逐工具配置。需要 `NET_ADMIN` 权限和 `/dev/net/tun` 设备（compose 已配置好）。
-- **SOCKS5 / HTTP 端口代理**：容器内 `127.0.0.1:1080`（SOCKS5）、`127.0.0.1:1081`（HTTP），已映射到宿主机同名端口，宿主机应用也能用。
+- **TUN 全局透明代理**：容器内所有流量（git、apt、pip、claude 等）自动分流，无需逐工具配置，也无需暴露任何端口。需要 `NET_ADMIN` 权限和 `/dev/net/tun` 设备（compose 已配置好）。
 
 ### 分流规则
 
@@ -87,12 +86,14 @@ sing-box 内置 SSH outbound——直接把 SSH 服务器当作代理通道（si
 
 ```bash
 docker run -d --name dev-env --cap-add=NET_ADMIN --device=/dev/net/tun \
-  -p 2222:22 -p 1080:1080 -p 1081:1081 \
+  -p 2222:22 \
   -e SSH_PROXY_SERVER=my-server.com \
   -e SSH_PROXY_USER=ubuntu \
   -e SSH_PROXY_PASSWORD='你的密码' \
   ghcr.io/zhai-research/dev-env/base:latest
 ```
+
+> 只映射 SSH 端口即可：代理是容器内 TUN 全局模式，不需要对外暴露任何代理端口。
 
 docker-compose：把变量写进项目目录 `.env`（compose 已透传；`.env` 已被 `.gitignore` 忽略，不会提交）：
 
@@ -118,15 +119,14 @@ SSH_PROXY_PASSWORD=你的密码
 ### 验证
 
 ```bash
-# 端口代理模式（国外站，应走代理）
-curl -x http://127.0.0.1:1081 https://www.google.com -I
+# 容器内访问国外站 (TUN 全局代理, 应走代理)
+docker exec dev-env curl https://www.google.com -I
 
-# TUN 模式（容器内直接访问，国内站应直连）
-docker-compose exec dev-env curl https://www.baidu.com -I
+# 容器内访问国内站 (应直连)
+docker exec dev-env curl https://www.baidu.com -I
 
-# 容器内工具走代理
-docker-compose exec dev-env bash
-export HTTP_PROXY=http://127.0.0.1:1081 HTTPS_PROXY=http://127.0.0.1:1081
+# 容器内工具 (claude 等) 无需配置任何代理环境变量, 直接可用
+docker exec -it dev-env bash
 claude
 ```
 
@@ -141,7 +141,7 @@ sing-box 由启动脚本后台启动，日志输出到容器 stdout：
 docker-compose logs dev-env | grep -i sing-box
 ```
 
-⚠️ 安全提示：socks/http inbound 监听 `0.0.0.0` 并映射到宿主机端口，局域网内其他设备也可访问。如仅在容器内使用，可把 listen 改为 `127.0.0.1`，或宿主机防火墙放行来源 IP。TUN 模式的问题排查：`strict_route: true` 在部分环境不兼容，可改为 `false`。
+⚠️ TUN 模式的问题排查：`strict_route: true` 在部分环境不兼容，可改为 `false`。
 
 ## 使用 uv
 

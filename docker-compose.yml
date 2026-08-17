@@ -7,8 +7,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "2222:22"
-      - "1080:1080"   # sing-box SOCKS5
-      - "1081:1081"   # sing-box HTTP
     restart: unless-stopped
     container_name: dev-base-env
     environment:
