@@ -1,6 +1,6 @@
 FROM debian:13
 
-# GitHub 下载加速代理: 默认直连官方; 国内网络需要加速时
+# GitHub 下载加速代理: 默认直连官方; 需要加速时
 # 构建传 --build-arg GH_PROXY=https://gh-proxy.com (或其它代理前缀)
 ARG GH_PROXY=
 
@@ -18,7 +18,7 @@ ENV TZ=Asia/Shanghai \
 
 ENV PATH="$FNM_DIR:$PATH"
 
-# 安装基础依赖
+# 安装基础依赖 (构建在 GitHub Actions 上进行, 走官方 apt 源最快)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl direnv git vim tmux openssh-server python3 unzip ripgrep sudo \
     && rm -rf /var/lib/apt/lists/*
@@ -42,7 +42,6 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
 
 # 安装 rtk (系统级, 按目标架构下载最新稳定版)
 # gh-proxy 偶发 HTTP/2 流错误 (curl exit 92), 下载统一强制 HTTP/1.1 + 重试
-# 多平台构建时两平台并发下载更易触发, 加重试兜底
 RUN case "$(uname -m)" in \
       aarch64) RTK_ASSET=rtk-aarch64-unknown-linux-gnu ;; \
       *)       RTK_ASSET=rtk-x86_64-unknown-linux-musl ;; \
@@ -63,7 +62,6 @@ RUN SING_BOX_VERSION="$(curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_
     && rm -rf /tmp/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}
 
 # 安装 fnm (系统级, 按目标架构下载最新稳定版)
-# 从 GitHub Releases 下载 (gh-proxy), 避免 fnm.vercel.app 在国内不稳定
 RUN case "$(uname -m)" in \
       aarch64) FNM_ASSET=fnm-arm64 ;; \
       *)       FNM_ASSET=fnm-linux ;; \
@@ -73,14 +71,16 @@ RUN case "$(uname -m)" in \
     && rm /tmp/fnm.zip
 
 # 用户级工具 (node LTS, npm 全局包)
+# 构建在 GitHub Actions 上: npm 从官方 registry 安装最快
 USER developer
 
 RUN git config --global url."${GH_PROXY:+${GH_PROXY}/}https://github.com/".insteadOf https://github.com/ \
     && eval "$(fnm env)" \
     && fnm install --lts \
     && fnm use lts-latest \
-    && npm i -g opencode-ai @anthropic-ai/claude-code \
+    && npm i -g --no-audit --no-fund opencode-ai @anthropic-ai/claude-code \
     && npm config set registry https://registry.npmmirror.com \
+    && npm cache clean --force \
     && cat >> ~/.bashrc <<'EOF'
 # fnm: 自动切换 node 版本
 eval "$(fnm env --use-on-cd)"
@@ -128,7 +128,7 @@ USER root
 RUN ln -sfn "$(ls -d /home/developer/.local/share/fnm/node-versions/v*/installation/bin)" /usr/local/node-bin
 ENV PATH="/usr/local/node-bin:$PATH"
 
-# 全部安装完成后切换为清华源
+# 全部安装完成后切换为清华源 (镜像部署在国内时 apt 可用, 不影响 CI 构建过程)
 RUN cat > /etc/apt/sources.list.d/debian.sources <<'EOF'
 Types: deb
 URIs: https://mirrors.tuna.tsinghua.edu.cn/debian
@@ -157,8 +157,7 @@ RUN mkdir -p /home/developer/.config/uv
 COPY --chown=developer:developer configs/uv.toml /home/developer/.config/uv/uv.toml
 
 # 设置镜像环境变量
-ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY:+${GH_PROXY}/}https://github.com/astral-sh/python-build-standalone/releases/download \
-    FNM_NODE_DIST_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
+ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY:+${GH_PROXY}/}https://github.com/astral-sh/python-build-standalone/releases/download
 
 # sing-box 配置 (模板; 镜像不内置任何代理服务器信息, SSH 代理由运行时环境变量渲染)
 COPY configs/sing-box/config.json /etc/sing-box/config.json

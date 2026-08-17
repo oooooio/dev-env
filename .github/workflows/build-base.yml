@@ -9,6 +9,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# 同一分支的新 push 自动取消进行中的旧构建, 避免堆积/卡死占用资源
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/base
