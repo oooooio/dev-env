@@ -37,21 +37,23 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uvx /usr/local/bin/uvx
 
 # 安装 rtk (系统级, 按目标架构下载最新稳定版)
+# gh-proxy 偶发 HTTP/2 流错误 (curl exit 92), 下载统一强制 HTTP/1.1 + 重试
+# 多平台构建时两平台并发下载更易触发, 加重试兜底
 RUN case "$(uname -m)" in \
       aarch64) RTK_ASSET=rtk-aarch64-unknown-linux-gnu ;; \
       *)       RTK_ASSET=rtk-x86_64-unknown-linux-musl ;; \
     esac \
-    && curl -LsSf "${GH_PROXY}/https://github.com/rtk-ai/rtk/releases/latest/download/${RTK_ASSET}.tar.gz" \
+    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://github.com/rtk-ai/rtk/releases/latest/download/${RTK_ASSET}.tar.gz" \
     | tar xz -C /usr/local/bin
 
 # 安装 sing-box (系统级, 按目标架构下载最新稳定版)
-RUN SING_BOX_VERSION="$(curl -LsSf "${GH_PROXY}/https://api.github.com/repos/SagerNet/sing-box/releases/latest" \
+RUN SING_BOX_VERSION="$(curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://api.github.com/repos/SagerNet/sing-box/releases/latest" \
       | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')" \
     && case "$(uname -m)" in \
       aarch64) SING_BOX_ARCH=arm64 ;; \
       *)       SING_BOX_ARCH=amd64 ;; \
     esac \
-    && curl -LsSf "${GH_PROXY}/https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}.tar.gz" \
+    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}.tar.gz" \
     | tar xz -C /tmp \
     && mv /tmp/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}/sing-box /usr/local/bin/sing-box \
     && rm -rf /tmp/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}
@@ -62,7 +64,7 @@ RUN case "$(uname -m)" in \
       aarch64) FNM_ASSET=fnm-arm64 ;; \
       *)       FNM_ASSET=fnm-linux ;; \
     esac \
-    && curl -LsSf "${GH_PROXY}/https://github.com/Schniz/fnm/releases/latest/download/${FNM_ASSET}.zip" -o /tmp/fnm.zip \
+    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://github.com/Schniz/fnm/releases/latest/download/${FNM_ASSET}.zip" -o /tmp/fnm.zip \
     && unzip -o /tmp/fnm.zip -d /usr/local/bin \
     && rm /tmp/fnm.zip
 
