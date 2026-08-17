@@ -73,24 +73,28 @@ RUN eval "$(fnm env)" \
     && fnm use lts-latest \
     && npm i -g --no-audit --no-fund opencode-ai @anthropic-ai/claude-code \
     && npm cache clean --force \
-    && cat >> ~/.bashrc <<'EOF'
-# fnm: 自动切换 node 版本
-eval "$(fnm env --use-on-cd)"
-# direnv: 自动加载 .envrc (docker exec / 非登录 shell)
-eval "$(direnv hook bash)"
-# 开发容器信任所有 .envrc, 进入目录或编辑 .envrc 后自动 allow, 无需手动执行
+    && mkdir -p ~/.config/direnv \
+    && cat > ~/.config/direnv/bash-init <<'EOF'
+# direnv: 自动加载 .envrc
 if ! command -v _direnv_auto_allow >/dev/null 2>&1; then
     _direnv_auto_allow() {
-        [ -f .envrc ] && direnv allow >/dev/null 2>&1
+        [[ -f .envrc ]] && direnv allow >/dev/null 2>&1
     }
     cd() {
         builtin cd "$@" || return $?
         _direnv_auto_allow
     }
 fi
-if [[ "${PROMPT_COMMAND[*]:-}" != *"_direnv_auto_allow"* ]]; then
-    PROMPT_COMMAND=(_direnv_auto_allow "${PROMPT_COMMAND[@]}")
-fi
+# 处理 shell 启动时当前目录已经是项目目录的情况
+_direnv_auto_allow
+eval "$(direnv hook bash)"
+EOF
+
+RUN cat >> ~/.bashrc <<'EOF'
+# fnm: 自动切换 node 版本
+eval "$(fnm env --use-on-cd)"
+# direnv: 自动加载 .envrc (docker exec / 非登录 shell)
+source "$HOME/.config/direnv/bash-init"
 EOF
 
 # 登录 shell 配置 (SSH 会话): .profile 只在登录 shell 读取, 且会被 /etc/profile 重置 PATH
@@ -99,19 +103,7 @@ RUN cat > ~/.profile <<'EOF'
 export PATH="/usr/local/node-bin:$FNM_DIR:$PATH"
 eval "$(fnm env --use-on-cd)"
 # direnv: 自动加载 .envrc (SSH 登录 shell)
-eval "$(direnv hook bash)"
-if ! command -v _direnv_auto_allow >/dev/null 2>&1; then
-    _direnv_auto_allow() {
-        [ -f .envrc ] && direnv allow >/dev/null 2>&1
-    }
-    cd() {
-        builtin cd "$@" || return $?
-        _direnv_auto_allow
-    }
-fi
-if [[ "${PROMPT_COMMAND[*]:-}" != *"_direnv_auto_allow"* ]]; then
-    PROMPT_COMMAND=(_direnv_auto_allow "${PROMPT_COMMAND[@]}")
-fi
+source "$HOME/.config/direnv/bash-init"
 EOF
 
 USER root
