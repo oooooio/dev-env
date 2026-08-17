@@ -14,18 +14,7 @@
       }
     ]
   },
-  "inbounds": [
-    {
-      "type": "tun",
-      "tag": "tun-in",
-      "interface_name": "tun0",
-      "address": [
-        "10.0.0.1/30"
-      ],
-      "auto_route": true,
-      "strict_route": true
-    }
-  ],
+  "inbounds": [],
   "outbounds": [
     {
       "type": "direct",

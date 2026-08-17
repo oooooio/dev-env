@@ -37,7 +37,7 @@ docker-compose down
 - Python：系统 python3 + [uv](https://astral.sh/uv)（极速 Python 包管理器和运行器，系统级安装）
 - Node.js：[fnm](https://github.com/Schniz/fnm) + 最新 LTS 版本，含 npm 全局包 `opencode-ai`、`@anthropic-ai/claude-code`
 - [rtk](https://github.com/rtk-ai/rtk) - Rust Token Killer，系统级安装
-- [sing-box](https://github.com/SagerNet/sing-box) - 代理客户端（TUN 全局代理 + SOCKS5/HTTP 端口代理）
+- [sing-box](https://github.com/SagerNet/sing-box) - 可手动配置的代理客户端（默认不启用 inbound/TUN）
 - SSH 服务：仅密钥登录，禁用 root，端口 22
 
 ## SSH 连接
@@ -56,92 +56,65 @@ SSH 配置：`PermitRootLogin no`、`PasswordAuthentication no`，仅允许密�
 
 ## sing-box 代理客户端
 
-镜像内置 sing-box 客户端，提供**容器内 TUN 全局透明代理**，并内置**国内直连 / 国外代理分流**：
+镜像内置 sing-box，但默认不配置任何 inbound，因此不会创建 TUN 网卡，也不会自动接管容器流量。基础配置位于：
 
-- **TUN 全局透明代理**：容器内所有流量（git、apt、pip、claude 等）自动分流，无需逐工具配置，也无需暴露任何端口。需要 `NET_ADMIN` 权限和 `/dev/net/tun` 设备（compose 已配置好）。
-
-### 分流规则
-
-```
-国内域名 (geosite-cn)    ──┐
-国内 IP (geoip-cn)       ──┼──→ 直连
-私有网段 (10/8, 172/12…)  ──┘
-其余所有流量             ──────→ 代理
+```text
+/etc/sing-box/config.json
 ```
 
-- 域名识别靠 TLS SNI / HTTP Host 嗅探（`sniff`），国内域名走 geosite-cn 规则集，直连不受代理影响
-- DNS 由 sing-box 接管（`hijack-dns`），统一走 223.5.5.5 直连解析，不经过代理
-- 规则集（geosite-cn / geoip-cn）首次启动从 `raw.githubusercontent.com` 下载，之后缓存复用
-
-### 用 SSH 服务器当代理（运行时环境变量）
-
-sing-box 内置 SSH outbound——直接把 SSH 服务器当作代理通道（sing-box 自己建立 SSH 连接，无需单独跑 `ssh -D`）。**镜像不内置任何代理服务器信息**（公开镜像，任何人都能拉取），SSH 代理完全在运行时通过环境变量配置：
-
-| 环境变量 | 说明 | 默认 |
-|---|---|---|
-| `SSH_PROXY_SERVER` | SSH 服务器地址（与密码**同时设置**才启用） | - |
-| `SSH_PROXY_PASSWORD` | SSH 密码 | - |
-| `SSH_PROXY_USER` | 登录用户 | root |
-| `SSH_PROXY_PORT` | SSH 端口 | 22 |
+当前配置仅保留 direct/block outbound。需要手动使用 SSH outbound 时，执行独立脚本生成运行时配置：
 
 ```bash
-docker run -d --name dev-env --cap-add=NET_ADMIN --device=/dev/net/tun \
-  -p 2222:22 \
-  -e SSH_PROXY_SERVER=my-server.com \
-  -e SSH_PROXY_USER=ubuntu \
-  -e SSH_PROXY_PASSWORD='你的密码' \
-  ghcr.io/zhai-research/dev-env/base:latest
+# 密码认证（脚本会交互式读取密码）
+sudo /usr/local/bin/render-ssh-proxy.sh \
+  proxy.example.com 22 ubuntu
+
+# 私钥认证
+sudo /usr/local/bin/render-ssh-proxy.sh \
+  proxy.example.com 22 ubuntu /home/developer/.ssh/proxy_key
 ```
 
-> 只映射 SSH 端口即可：代理是容器内 TUN 全局模式，不需要对外暴露任何代理端口。
+脚本生成：
 
-docker-compose：把变量写进项目目录 `.env`（compose 已透传；`.env` 已被 `.gitignore` 忽略，不会提交）：
-
-```
-# .env
-SSH_PROXY_SERVER=my-server.com
-SSH_PROXY_USER=ubuntu
-SSH_PROXY_PASSWORD=你的密码
+```text
+/etc/sing-box/config.runtime.json
 ```
 
-启动脚本检测到 server+password 都有值时，动态生成 SSH outbound（密码认证）注入配置，分流规则不变（国内直连、国外走 SSH 隧道）。**改服务器 = 改环境变量重启**；**未配置时不启动 sing-box**。
-
-⚠️ 注意：
-
-- `SSH_PROXY_SERVER` 和 `SSH_PROXY_PASSWORD` **必须同时有值**才启用；只有其一日志会告警（`WARN: SSH_PROXY_*`），代理不启用但容器照常运行
-- 密码会出现在 `docker inspect` 和部署机 `.env` 里，仅限信任的宿主机使用（`.env` 不提交 git）
-- SSH 主机校验默认关闭（`host_key` 未设置时接受任意主机密钥），生产环境建议在配置里固定 `host_key`
-
-### 修改分流规则等基础配置
-
-镜像的基础配置（inbounds、DNS、分流规则）在 `configs/sing-box/config.json`——**不含任何代理服务器信息**，SSH 代理由运行时渲染注入。要改分流规则：编辑该文件后 `docker build -t dev-env .` 重建；或运行时用 `-v ./configs/sing-box/config.json:/etc/sing-box/config.json` 挂载覆盖。不需要 TUN 时删除 `tun-in` inbound 即可。
-
-### 验证
+然后手动校验并启动：
 
 ```bash
-# 容器内访问国外站 (TUN 全局代理, 应走代理)
-docker exec dev-env curl https://www.google.com -I
-
-# 容器内访问国内站 (应直连)
-docker exec dev-env curl https://www.baidu.com -I
-
-# 容器内工具 (claude 等) 无需配置任何代理环境变量, 直接可用
-docker exec -it dev-env bash
-claude
+sudo sing-box check -c /etc/sing-box/config.runtime.json
+sudo sing-box run -c /etc/sing-box/config.runtime.json
 ```
 
-⚠️ **本地测试注意（macOS + 宿主机代理）**：如果宿主机本身开了代理（如 sing-box TUN + fakeip），宿主机会拦截容器内所有 DNS 查询并返回虚拟 IP，导致容器内"直连"路径无法工作——这是宿主机环境造成的，不是配置问题；在真实 DNS 环境（VPS/服务器）分流正常。本地调试可把容器 outbound 指向宿主机代理（如 `socks5://host.docker.internal:1080`）走通全链路。
+> 关闭 TUN 后，sing-box 没有 inbound，不会主动接收容器流量。若要让应用通过代理，必须另外配置 inbound，或在配置中加入其他流量接入方式。
 
-### 日志
+### 修改 sing-box 配置
 
-sing-box 由启动脚本后台启动，日志输出到容器 stdout：
+编辑 `configs/sing-box/config.json` 后重新构建镜像；也可以运行时挂载覆盖：
 
 ```bash
-# 宿主机查看
-docker-compose logs dev-env | grep -i sing-box
+docker build -t dev-env .
+docker run --rm -it \
+  -v ./configs/sing-box/config.json:/etc/sing-box/config.json:ro \
+  dev-env
 ```
 
-⚠️ TUN 模式的问题排查：`strict_route: true` 在部分环境不兼容，可改为 `false`。
+### 验证配置与进程
+
+```bash
+sudo sing-box check -c /etc/sing-box/config.json
+ps -eo pid,user,args | grep '[s]ing-box'
+```
+
+sing-box 不再由容器启动命令自动启动；日志由手动启动命令决定，例如：
+
+```bash
+sudo nohup sing-box run \
+  -c /etc/sing-box/config.runtime.json \
+  >/var/log/sing-box.log 2>&1 &
+tail -f /var/log/sing-box.log
+```
 
 ## 使用 uv
 
