@@ -141,7 +141,10 @@ EOF
 RUN mkdir -p /var/run/sshd \
     && ssh-keygen -A \
     && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config \
-    && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+    && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config \
+    && echo 'PATH="/usr/local/node-bin:/usr/local/bin:/usr/bin:/bin"' > /etc/environment
+# sshd 会话环境来自 PAM (pam_env 读 /etc/environment), 不继承镜像 ENV;
+# 上面写入 node 路径, 保证 ssh host 'cmd' 等非登录 shell (不读 .profile) 也能用 node
 
 # uv 配置
 RUN mkdir -p /home/developer/.config/uv
