@@ -129,6 +129,28 @@ RUN mkdir -p /var/run/sshd \
 # sshd 会话环境来自 PAM (pam_env 读 /etc/environment), 不继承镜像 ENV;
 # 上面写入 node 路径, 保证 ssh host 'cmd' 等非登录 shell (不读 .profile) 也能用 node
 
+# 容器内应用使用 sing-box 的本地 SOCKS5/HTTP inbound；启动 sing-box 后自动生效
+ENV HTTP_PROXY=http://127.0.0.1:1081 \
+    HTTPS_PROXY=http://127.0.0.1:1081 \
+    ALL_PROXY=socks5h://127.0.0.1:1080 \
+    NO_PROXY=localhost,127.0.0.1,::1 \
+    http_proxy=http://127.0.0.1:1081 \
+    https_proxy=http://127.0.0.1:1081 \
+    all_proxy=socks5h://127.0.0.1:1080 \
+    no_proxy=localhost,127.0.0.1,::1
+
+# 同步注入 SSH 登录 shell；/etc/environment 不支持变量展开，因此使用完整值
+RUN cat >> /etc/environment <<'EOF'
+HTTP_PROXY=http://127.0.0.1:1081
+HTTPS_PROXY=http://127.0.0.1:1081
+ALL_PROXY=socks5h://127.0.0.1:1080
+NO_PROXY=localhost,127.0.0.1,::1
+http_proxy=http://127.0.0.1:1081
+https_proxy=http://127.0.0.1:1081
+all_proxy=socks5h://127.0.0.1:1080
+no_proxy=localhost,127.0.0.1,::1
+EOF
+
 # sing-box 配置模板 (SSH 代理由手动执行 render-ssh-proxy.sh 生成运行时配置)
 COPY configs/sing-box/config.json /etc/sing-box/config.json
 

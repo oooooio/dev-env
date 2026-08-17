@@ -37,7 +37,7 @@ docker-compose down
 - Python：系统 python3 + [uv](https://astral.sh/uv)（极速 Python 包管理器和运行器，系统级安装）
 - Node.js：[fnm](https://github.com/Schniz/fnm) + 最新 LTS 版本，含 npm 全局包 `opencode-ai`、`@anthropic-ai/claude-code`
 - [rtk](https://github.com/rtk-ai/rtk) - Rust Token Killer，系统级安装
-- [sing-box](https://github.com/SagerNet/sing-box) - 可手动配置的代理客户端（默认不启用 inbound/TUN）
+- [sing-box](https://github.com/SagerNet/sing-box) - 代理客户端（本地 SOCKS5/HTTP inbound，关闭 TUN）
 - SSH 服务：仅密钥登录，禁用 root，端口 22
 
 ## SSH 连接
@@ -56,13 +56,22 @@ SSH 配置：`PermitRootLogin no`、`PasswordAuthentication no`，仅允许密�
 
 ## sing-box 代理客户端
 
-镜像内置 sing-box，但默认不配置任何 inbound，因此不会创建 TUN 网卡，也不会自动接管容器流量。基础配置位于：
+镜像内置 sing-box，默认关闭 TUN，改为提供仅监听容器内部的 SOCKS5/HTTP inbound：
 
 ```text
-/etc/sing-box/config.json
+SOCKS5: 127.0.0.1:1080
+HTTP:   127.0.0.1:1081
 ```
 
-当前配置仅保留 direct/block outbound。需要手动使用 SSH outbound 时，执行独立脚本生成运行时配置：
+容器不会对外暴露这两个端口。Dockerfile 已设置容器内应用代理环境变量：
+
+```text
+HTTP_PROXY=http://127.0.0.1:1081
+HTTPS_PROXY=http://127.0.0.1:1081
+ALL_PROXY=socks5h://127.0.0.1:1080
+```
+
+配置 SSH outbound 时，执行独立脚本生成运行时配置：
 
 ```bash
 # 密码认证（脚本会交互式读取密码）
@@ -80,14 +89,16 @@ sudo /usr/local/bin/render-ssh-proxy.sh \
 /etc/sing-box/config.runtime.json
 ```
 
-然后手动校验并启动：
+然后手动校验并启动 sing-box：
 
 ```bash
 sudo sing-box check -c /etc/sing-box/config.runtime.json
-sudo sing-box run -c /etc/sing-box/config.runtime.json
+sudo nohup sing-box run \
+  -c /etc/sing-box/config.runtime.json \
+  >/var/log/sing-box.log 2>&1 &
 ```
 
-> 关闭 TUN 后，sing-box 没有 inbound，不会主动接收容器流量。若要让应用通过代理，必须另外配置 inbound，或在配置中加入其他流量接入方式。
+启动后，容器内支持 `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` 的应用会通过本地 inbound 使用 SSH outbound。sing-box 不由容器启动命令自动启动。
 
 ### 修改 sing-box 配置
 
@@ -100,19 +111,17 @@ docker run --rm -it \
   dev-env
 ```
 
-### 验证配置与进程
+### 验证配置、代理和进程
 
 ```bash
-sudo sing-box check -c /etc/sing-box/config.json
+sudo sing-box check -c /etc/sing-box/config.runtime.json
 ps -eo pid,user,args | grep '[s]ing-box'
+curl -I https://example.com
 ```
 
-sing-box 不再由容器启动命令自动启动；日志由手动启动命令决定，例如：
+日志：
 
 ```bash
-sudo nohup sing-box run \
-  -c /etc/sing-box/config.runtime.json \
-  >/var/log/sing-box.log 2>&1 &
 tail -f /var/log/sing-box.log
 ```
 
