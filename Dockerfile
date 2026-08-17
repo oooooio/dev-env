@@ -14,7 +14,7 @@ ENV PATH="$FNM_DIR:$PATH"
 
 # 安装基础依赖 (构建在 GitHub Actions 上进行, 走官方 apt 源最快)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl direnv git vim tmux openssh-server python3 unzip ripgrep sudo \
+    && apt-get install -y --no-install-recommends ca-certificates curl direnv git jq vim tmux openssh-server python3 unzip ripgrep sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建普通用户并授权 sudo
@@ -132,10 +132,10 @@ RUN mkdir -p /var/run/sshd \
 # sing-box 配置 (模板; 镜像不内置任何代理服务器信息, SSH 代理由运行时环境变量渲染)
 COPY configs/sing-box/config.json /etc/sing-box/config.json
 
-# 启动脚本 (sshd + sing-box) 与 SSH 代理渲染器
+# 启动脚本 (sshd) 与手动 SSH 代理配置脚本
 COPY scripts/start.sh /usr/local/bin/start.sh
-COPY scripts/render-ssh-proxy.py /usr/local/bin/render-ssh-proxy.py
-RUN chmod +x /usr/local/bin/start.sh
+COPY scripts/render-ssh-proxy.sh /usr/local/bin/render-ssh-proxy.sh
+RUN chmod +x /usr/local/bin/start.sh /usr/local/bin/render-ssh-proxy.sh
 
 EXPOSE 22
 
