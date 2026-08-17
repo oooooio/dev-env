@@ -72,7 +72,7 @@ SSH 配置：`PermitRootLogin no`、`PasswordAuthentication no`，仅允许密�
 
 - 域名识别靠 TLS SNI / HTTP Host 嗅探（`sniff`），国内域名走 geosite-cn 规则集，直连不受代理影响
 - DNS 由 sing-box 接管（`hijack-dns`），统一走 223.5.5.5 直连解析，不经过代理
-- 规则集（geosite-cn / geoip-cn）首次启动从 gh-proxy 下载，之后缓存复用
+- 规则集（geosite-cn / geoip-cn）首次启动从 `raw.githubusercontent.com` 下载，之后缓存复用
 
 ### 用 SSH 服务器当代理（运行时环境变量）
 
@@ -148,7 +148,7 @@ docker-compose logs dev-env | grep -i sing-box
 - **APT**：清华镜像（tuna），镜像构建完成后自动切换
 - **PyPI**：清华源（见 `configs/uv.toml`）
 - **npm**：`registry.npmmirror.com`
-- **GitHub**：git clone 自动走 `gh-proxy.com` 代理
+- **GitHub**：直连；国内网络加速可在构建时传 `--build-arg GH_PROXY=https://gh-proxy.com`
 - **HuggingFace**：`hf-mirror.com`（`HF_ENDPOINT`）
 - **Node.js 发行版**：清华 nodejs 镜像（`FNM_NODE_DIST_MIRROR`）
 

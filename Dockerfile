@@ -1,5 +1,9 @@
 FROM debian:13
 
+# GitHub 下载加速代理: 默认直连官方; 国内网络需要加速时
+# 构建传 --build-arg GH_PROXY=https://gh-proxy.com (或其它代理前缀)
+ARG GH_PROXY=
+
 ENV TZ=Asia/Shanghai \
     LANG=C.UTF-8 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -8,7 +12,7 @@ ENV TZ=Asia/Shanghai \
     UV_NO_EDITABLE=1 \
     UV_LINK_MODE=copy \
     UV_VENV_DIR=/venv \
-    GH_PROXY=https://gh-proxy.com \
+    GH_PROXY=${GH_PROXY} \
     FNM_DIR=/home/developer/.local/share/fnm \
     HF_ENDPOINT=https://hf-mirror.com
 
@@ -43,17 +47,17 @@ RUN case "$(uname -m)" in \
       aarch64) RTK_ASSET=rtk-aarch64-unknown-linux-gnu ;; \
       *)       RTK_ASSET=rtk-x86_64-unknown-linux-musl ;; \
     esac \
-    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://github.com/rtk-ai/rtk/releases/latest/download/${RTK_ASSET}.tar.gz" \
+    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY:+${GH_PROXY}/}https://github.com/rtk-ai/rtk/releases/latest/download/${RTK_ASSET}.tar.gz" \
     | tar xz -C /usr/local/bin
 
 # 安装 sing-box (系统级, 按目标架构下载最新稳定版)
-RUN SING_BOX_VERSION="$(curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://api.github.com/repos/SagerNet/sing-box/releases/latest" \
+RUN SING_BOX_VERSION="$(curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY:+${GH_PROXY}/}https://api.github.com/repos/SagerNet/sing-box/releases/latest" \
       | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')" \
     && case "$(uname -m)" in \
       aarch64) SING_BOX_ARCH=arm64 ;; \
       *)       SING_BOX_ARCH=amd64 ;; \
     esac \
-    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}.tar.gz" \
+    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY:+${GH_PROXY}/}https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}.tar.gz" \
     | tar xz -C /tmp \
     && mv /tmp/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}/sing-box /usr/local/bin/sing-box \
     && rm -rf /tmp/sing-box-${SING_BOX_VERSION}-linux-${SING_BOX_ARCH}
@@ -64,14 +68,14 @@ RUN case "$(uname -m)" in \
       aarch64) FNM_ASSET=fnm-arm64 ;; \
       *)       FNM_ASSET=fnm-linux ;; \
     esac \
-    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY}/https://github.com/Schniz/fnm/releases/latest/download/${FNM_ASSET}.zip" -o /tmp/fnm.zip \
+    && curl -LsSf --retry 3 --retry-all-errors --http1.1 "${GH_PROXY:+${GH_PROXY}/}https://github.com/Schniz/fnm/releases/latest/download/${FNM_ASSET}.zip" -o /tmp/fnm.zip \
     && unzip -o /tmp/fnm.zip -d /usr/local/bin \
     && rm /tmp/fnm.zip
 
 # 用户级工具 (node LTS, npm 全局包)
 USER developer
 
-RUN git config --global url."${GH_PROXY}/https://github.com/".insteadOf https://github.com/ \
+RUN git config --global url."${GH_PROXY:+${GH_PROXY}/}https://github.com/".insteadOf https://github.com/ \
     && eval "$(fnm env)" \
     && fnm install --lts \
     && fnm use lts-latest \
@@ -153,7 +157,7 @@ RUN mkdir -p /home/developer/.config/uv
 COPY --chown=developer:developer configs/uv.toml /home/developer/.config/uv/uv.toml
 
 # 设置镜像环境变量
-ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY}/https://github.com/astral-sh/python-build-standalone/releases/download \
+ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY:+${GH_PROXY}/}https://github.com/astral-sh/python-build-standalone/releases/download \
     FNM_NODE_DIST_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
 
 # sing-box 配置 (模板; 镜像不内置任何代理服务器信息, SSH 代理由运行时环境变量渲染)
