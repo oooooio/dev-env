@@ -1,6 +1,6 @@
 # Docker 开发环境
 
-基于 Debian 13 的精简 Docker 开发环境，内置 Python (uv) 和 Node.js (fnm) 工具链、SSH 远程访问，以及针对国内网络的镜像源配置。
+基于 Debian 13 的精简 Docker 开发环境，内置 Python (uv) 和 Node.js (fnm) 工具链、SSH 远程访问、sing-box 代理客户端与 SSH 代理支持。
 
 ## 使用说明
 
@@ -143,15 +143,6 @@ docker-compose logs dev-env | grep -i sing-box
 
 ⚠️ 安全提示：socks/http inbound 监听 `0.0.0.0` 并映射到宿主机端口，局域网内其他设备也可访问。如仅在容器内使用，可把 listen 改为 `127.0.0.1`，或宿主机防火墙放行来源 IP。TUN 模式的问题排查：`strict_route: true` 在部分环境不兼容，可改为 `false`。
 
-## 镜像源（国内网络优化）
-
-- **APT**：清华镜像（tuna），镜像构建完成后自动切换
-- **PyPI**：清华源（见 `configs/uv.toml`）
-- **npm**：`registry.npmmirror.com`
-- **GitHub**：直连；国内网络加速可在构建时传 `--build-arg GH_PROXY=https://gh-proxy.com`
-- **HuggingFace**：`hf-mirror.com`（`HF_ENDPOINT`）
-- **Node.js 发行版**：清华 nodejs 镜像（`FNM_NODE_DIST_MIRROR`）
-
 ## 使用 uv
 
 ```bash
@@ -171,7 +162,7 @@ uv run --python 3.12 script.py
 
 ## 自定义
 
-修改 `Dockerfile` 添加更多工具，或修改 `configs/uv.toml` 更改 uv 配置。
+修改 `Dockerfile` 添加更多工具；GitHub 下载默认直连，国内网络加速可在构建时传 `--build-arg GH_PROXY=https://gh-proxy.com`。
 
 ## 镜像仓库
 

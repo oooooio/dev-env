@@ -13,8 +13,7 @@ ENV TZ=Asia/Shanghai \
     UV_LINK_MODE=copy \
     UV_VENV_DIR=/venv \
     GH_PROXY=${GH_PROXY} \
-    FNM_DIR=/home/developer/.local/share/fnm \
-    HF_ENDPOINT=https://hf-mirror.com
+    FNM_DIR=/home/developer/.local/share/fnm
 
 ENV PATH="$FNM_DIR:$PATH"
 
@@ -79,7 +78,6 @@ RUN git config --global url."${GH_PROXY:+${GH_PROXY}/}https://github.com/".inste
     && fnm install --lts \
     && fnm use lts-latest \
     && npm i -g --no-audit --no-fund opencode-ai @anthropic-ai/claude-code \
-    && npm config set registry https://registry.npmmirror.com \
     && npm cache clean --force \
     && cat >> ~/.bashrc <<'EOF'
 # fnm: 自动切换 node 版本
@@ -128,21 +126,6 @@ USER root
 RUN ln -sfn "$(ls -d /home/developer/.local/share/fnm/node-versions/v*/installation/bin)" /usr/local/node-bin
 ENV PATH="/usr/local/node-bin:$PATH"
 
-# 全部安装完成后切换为清华源 (镜像部署在国内时 apt 可用, 不影响 CI 构建过程)
-RUN cat > /etc/apt/sources.list.d/debian.sources <<'EOF'
-Types: deb
-URIs: https://mirrors.tuna.tsinghua.edu.cn/debian
-Suites: trixie trixie-updates trixie-backports
-Components: main contrib non-free non-free-firmware
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-
-Types: deb
-URIs: https://security.debian.org/debian-security
-Suites: trixie-security
-Components: main contrib non-free non-free-firmware
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-EOF
-
 # SSH 配置
 RUN mkdir -p /var/run/sshd \
     && ssh-keygen -A \
@@ -151,13 +134,6 @@ RUN mkdir -p /var/run/sshd \
     && echo 'PATH="/usr/local/node-bin:/usr/local/bin:/usr/bin:/bin"' > /etc/environment
 # sshd 会话环境来自 PAM (pam_env 读 /etc/environment), 不继承镜像 ENV;
 # 上面写入 node 路径, 保证 ssh host 'cmd' 等非登录 shell (不读 .profile) 也能用 node
-
-# uv 配置
-RUN mkdir -p /home/developer/.config/uv
-COPY --chown=developer:developer configs/uv.toml /home/developer/.config/uv/uv.toml
-
-# 设置镜像环境变量
-ENV UV_PYTHON_INSTALL_MIRROR=${GH_PROXY:+${GH_PROXY}/}https://github.com/astral-sh/python-build-standalone/releases/download
 
 # sing-box 配置 (模板; 镜像不内置任何代理服务器信息, SSH 代理由运行时环境变量渲染)
 COPY configs/sing-box/config.json /etc/sing-box/config.json
