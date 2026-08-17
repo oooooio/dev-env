@@ -162,7 +162,7 @@ uv run --python 3.12 script.py
 
 ## 自定义
 
-修改 `Dockerfile` 添加更多工具；GitHub 下载默认直连，国内网络加速可在构建时传 `--build-arg GH_PROXY=https://gh-proxy.com`。
+修改 `Dockerfile` 添加更多工具；所有下载均走官方源直连。
 
 ## 镜像仓库
 
